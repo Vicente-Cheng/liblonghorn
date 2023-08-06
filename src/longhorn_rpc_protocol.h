@@ -12,7 +12,7 @@
 struct MessageHeader {
         uint16_t        MagicVersion;
         uint32_t        Seq;
-        uint32_t        Type;
+        uint16_t        Type;
         uint64_t        Offset;
         uint32_t        Size;
         uint32_t        DataLength;
@@ -21,7 +21,7 @@ struct MessageHeader {
 struct Message {
         uint16_t        MagicVersion;
         uint32_t        Seq;
-        uint32_t        Type;
+        uint16_t        Type;
         int64_t         Offset;
         uint32_t        Size;
         uint32_t        DataLength;

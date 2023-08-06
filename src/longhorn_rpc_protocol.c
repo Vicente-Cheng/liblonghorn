@@ -47,7 +47,7 @@ static ssize_t write_full(int fd, void *buf, ssize_t len) {
 static int write_header(int fd, struct Message *msg, uint8_t *header) {
         uint16_t MagicVersion = htole16(msg->MagicVersion);
 	uint32_t Seq = htole32(msg->Seq);
-	uint32_t Type = htole32(msg->Type);
+	uint16_t Type = htole16(msg->Type);
 	uint64_t Offset = htole64(*((uint64_t *)(&msg->Offset)));
 	uint32_t Size = htole32(msg->Size);
 	uint32_t DataLength = htole32(msg->DataLength);
@@ -121,7 +121,7 @@ static int read_header(int fd, struct Message *msg, uint8_t *header, int header_
         msg->Seq = le32toh(*((uint32_t *)(header + offset)));
         offset += sizeof(msg->Seq);
 
-        msg->Type = le32toh(*((uint32_t *)(header + offset)));
+        msg->Type = le16toh(*((uint16_t *)(header + offset)));
         offset += sizeof(msg->Type);
 
         Offset = le64toh(*((uint64_t *)(header + offset)));
