@@ -2,11 +2,12 @@
 #define LONGHORN_RPC_CLIENT_HEADER
 
 #include <pthread.h>
+#include <stdatomic.h>
 
 #include "longhorn_rpc_protocol.h"
 
 struct lh_client_conn {
-        int seq;  // must be atomic
+        atomic_uint seq;
         int fd;
         int notify_fd;
         int timeout_fd;

@@ -316,7 +316,7 @@ int start_process(struct lh_client_conn *conn) {
 }
 
 int new_seq(struct lh_client_conn *conn) {
-        return __sync_fetch_and_add(&conn->seq, 1);
+        return atomic_fetch_add(&conn->seq, 1);
 }
 
 int process_request(struct lh_client_conn *conn, void *buf, size_t count, off_t offset,
