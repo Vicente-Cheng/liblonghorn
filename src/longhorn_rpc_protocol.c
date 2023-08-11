@@ -3,7 +3,7 @@
 #include <errno.h>
 #include <endian.h>
 
-#include "log.h"
+#include "log/log.h"
 #include "longhorn_rpc_protocol.h"
 
 static ssize_t read_full(int fd, void *buf, ssize_t len) {
@@ -82,7 +82,7 @@ int send_msg(int fd, struct Message *msg, uint8_t *header, int header_size) {
 
         n = write_header(fd, msg, header);
         if (n != header_size) {
-                errorf("fail to write header\n");
+                log_error("fail to write header\n");
                 return -EINVAL;
         }
 
@@ -91,7 +91,7 @@ int send_msg(int fd, struct Message *msg, uint8_t *header, int header_size) {
 		if (n != msg->DataLength) {
                         if (n < 0)
                                 perror("fail writing data");
-			errorf("fail to write data, wrote %zd; expected %u\n",
+			log_error("fail to write data, wrote %zd; expected %u\n",
                                         n, msg->DataLength);
                         return -EINVAL;
 		}
@@ -105,7 +105,7 @@ static int read_header(int fd, struct Message *msg, uint8_t *header, int header_
 
         n = read_full(fd, header, header_size);
         if (n != header_size) {
-                errorf("fail to read header\n");
+                log_error("fail to read header\n");
 		return -EINVAL;
         }
 
@@ -113,7 +113,7 @@ static int read_header(int fd, struct Message *msg, uint8_t *header, int header_
         offset += sizeof(msg->MagicVersion);
 
         if (msg->MagicVersion != MAGIC_VERSION) {
-                errorf("wrong magic version 0x%x, expected 0x%x\n",
+                log_error("wrong magic version 0x%x, expected 0x%x\n",
                                 msg->MagicVersion, MAGIC_VERSION);
                 return -EINVAL;
         }
@@ -147,7 +147,7 @@ int receive_msg(int fd, struct Message *msg, uint8_t *header, int header_size) {
         // full-duplex, so no need to lock
         n = read_header(fd, msg, header, header_size);
         if (n != header_size) {
-                errorf("fail to read header\n");
+                log_error("fail to read header\n");
                 return -EINVAL;
         }
 
@@ -159,7 +159,7 @@ int receive_msg(int fd, struct Message *msg, uint8_t *header, int header_size) {
                 }
 		n = read_full(fd, msg->Data, msg->DataLength);
 		if (n != msg->DataLength) {
-                        errorf("Cannot read full from fd, %u vs %zd\n",
+                        log_error("Cannot read full from fd, %u vs %zd\n",
                                 msg->DataLength, n);
 			free(msg->Data);
 			return -EINVAL;

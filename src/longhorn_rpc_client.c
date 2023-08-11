@@ -16,7 +16,7 @@
 #include <time.h>
 #include <poll.h>
 
-#include "log.h"
+#include "log/log.h"
 #include "longhorn_rpc_client.h"
 
 int retry_interval = 5;
@@ -58,7 +58,7 @@ void update_timeout_timer(struct lh_client_conn *conn) {
                 if (timerfd_settime(conn->timeout_fd,
                                 TFD_TIMER_ABSTIME,
                                 &its, NULL) < 0) {
-                        errorf("BUG: Fail to set new timer\n");
+                        log_error("BUG: Fail to set new timer\n");
                 }
         } else {
                 // When there are no more messages on the queue, we disarm
@@ -70,7 +70,7 @@ void update_timeout_timer(struct lh_client_conn *conn) {
                 if (timerfd_settime(conn->timeout_fd,
                                 TFD_TIMER_ABSTIME,
                                 &its, NULL) < 0) {
-                        errorf("BUG: Fail to disarm timer\n");
+                        log_error("BUG: Fail to disarm timer\n");
                 }
         }
 }
@@ -127,7 +127,7 @@ int lh_client_close_conn(struct lh_client_conn *conn) {
                 return 0;
         }
 
-        errorf("Closing connection\n");
+        log_error("Closing connection\n");
 
         pthread_mutex_lock(&conn->mutex);
         if  (conn->state == CLIENT_CONN_STATE_CLOSE) {
@@ -149,25 +149,25 @@ int lh_client_close_conn(struct lh_client_conn *conn) {
 
                 pthread_mutex_lock(&req->mutex);
                 req->Type = TypeError;
-                errorf("Cancel request %d due to disconnection\n", req->Seq);
+                log_error("Cancel request %d due to disconnection\n", req->Seq);
                 pthread_mutex_unlock(&req->mutex);
                 pthread_cond_signal(&req->cond);
         }
         pthread_mutex_unlock(&conn->msg_mutex);
 
         if (pthread_cancel(conn->timeout_thread) < 0) {
-                errorf("Cannot cancel timeout thread\n");
+                log_error("Cannot cancel timeout thread\n");
         }
         if (pthread_cancel(conn->response_thread) < 0) {
-                errorf("Cannot cancel timeout thread\n");
+                log_error("Cannot cancel timeout thread\n");
         }
         if (pthread_join(conn->timeout_thread, NULL) < 0) {
-                errorf("Cannot wait for timeout thread\n");
+                log_error("Cannot wait for timeout thread\n");
         }
         if (pthread_join(conn->response_thread, NULL) < 0) {
-                errorf("Cannot wait timeout thread\n");
+                log_error("Cannot wait timeout thread\n");
         }
-        errorf("Connection close complete\n");
+        log_error("Connection close complete\n");
         return 0;
 }
 
@@ -189,7 +189,7 @@ void* response_process(void *arg) {
                 }
 
                 if (resp->Type == TypeClose) {
-                        errorf("Receive close message, about to end the connection\n");
+                        log_error("Receive close message, about to end the connection\n");
                         break;
                 }
 
@@ -197,23 +197,23 @@ void* response_process(void *arg) {
                 case TypeRead:
                 case TypeWrite:
                 case TypeUnmap:
-                        errorf("Wrong type for response %d of seq %d\n",
+                        log_error("Wrong type for response %d of seq %d\n",
                                         resp->Type, resp->Seq);
                         continue;
                 case TypeError:
-                        errorf("Receive error for response %d of seq %d\n",
+                        log_error("Receive error for response %d of seq %d\n",
 					resp->Type, resp->Seq);
                         /* fall through so we can response to caller */
                 case TypeEOF:
                 case TypeResponse:
                         break;
                 default:
-                        errorf("Unknown message type %d\n", resp->Type);
+                        log_error("Unknown message type %d\n", resp->Type);
                 }
 
                 req = find_and_remove_request_from_queue(conn, resp->Seq);
                 if (req == NULL) {
-                        errorf("Unknown response sequence %d\n", resp->Seq);
+                        log_error("Unknown response sequence %d\n", resp->Seq);
                         free(resp->Data);
                         continue;
                 }
@@ -237,7 +237,7 @@ void* response_process(void *arg) {
         }
         free(resp);
         if (ret != 0) {
-                errorf("Receive response returned error\n");
+                log_error("Receive response returned error\n");
         }
         lh_client_close_conn(conn);
         return NULL;
@@ -262,16 +262,16 @@ void *timeout_handler(void *arg) {
                         break;
                 }
                 if (fds[0].revents == POLLHUP) {
-                        errorf("Timeout fd closed\n");
+                        log_error("Timeout fd closed\n");
                         break;
                 }
                 if (ret != 1 || fds[0].revents != POLLIN) {
-                        errorf("BUG: Timeout fd polling have unexpected result\n");
+                        log_error("BUG: Timeout fd polling have unexpected result\n");
                         break;
                 }
 
                 if (clock_gettime(CLOCK_MONOTONIC, &now) < 0) {
-                        errorf("BUG: Fail to get current time\n");
+                        log_error("BUG: Fail to get current time\n");
                         break;
                 }
 
@@ -282,7 +282,7 @@ void *timeout_handler(void *arg) {
 
                         pthread_mutex_lock(&req->mutex);
                         req->Type = TypeError;
-                        errorf("Timeout request %d due to disconnection\n",
+                        log_error("Timeout request %d due to disconnection\n",
                                         req->Seq);
                         pthread_mutex_unlock(&req->mutex);
                         pthread_cond_signal(&req->cond);
@@ -326,7 +326,7 @@ int process_request(struct lh_client_conn *conn, void *buf, size_t count, off_t 
 
         pthread_mutex_lock(&conn->mutex);
         if (conn->state != CLIENT_CONN_STATE_OPEN) {
-                errorf("Cannot queue in more request. Connection is not open\n");
+                log_error("Cannot queue in more request. Connection is not open\n");
                 pthread_mutex_unlock(&conn->mutex);
                 return -EFAULT;
         }
@@ -338,7 +338,7 @@ int process_request(struct lh_client_conn *conn, void *buf, size_t count, off_t 
         }
 
         if (type != TypeRead && type != TypeWrite && type != TypeUnmap) {
-                errorf("BUG: Invalid type for process_request %d\n", type);
+                log_error("BUG: Invalid type for process_request %d\n", type);
                 rc = -EFAULT;
                 goto free;
         }
@@ -419,7 +419,7 @@ int lh_client_open_conn(struct lh_client_conn *conn, char *socket_path) {
         memset(&addr, 0, sizeof(addr));
         addr.sun_family = AF_UNIX;
         if (strlen(socket_path) >= 108) {
-                errorf("socket path is too long, more than 108 characters\n");
+                log_error("socket path is too long, more than 108 characters\n");
                 return -EINVAL;
         }
 
@@ -457,6 +457,7 @@ int lh_client_open_conn(struct lh_client_conn *conn, char *socket_path) {
         }
 
         conn->state = CLIENT_CONN_STATE_OPEN;
+        log_info("Connection opened!\n");
 
         return start_process(conn);
 }
@@ -488,5 +489,8 @@ void lh_client_free_conn(struct lh_client_conn *conn) {
                 free(conn->request_header);
                 free(conn->response_header);
                 free(conn);
+        }
+        if (logger_close() != 0) {
+                perror("Fail to close logger\n");
         }
 }

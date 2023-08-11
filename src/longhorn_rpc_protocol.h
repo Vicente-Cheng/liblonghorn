@@ -4,8 +4,8 @@
 #include <pthread.h>
 #include <time.h>
 
-#include "uthash.h"
-#include "utlist.h"
+#include "lib/uthash.h"
+#include "lib/utlist.h"
 
 #define MAGIC_VERSION 0x1b01 // LongHorn01
 

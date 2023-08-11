@@ -2,7 +2,7 @@ CC=gcc
 CFLAGS=-O2 -c -Wall
 LDFLAGS=
 LIBS=$(EXTRA_LIBS)
-OBJECTS=longhorn_rpc_client.o longhorn_rpc_protocol.o
+OBJECTS=log.o longhorn_rpc_client.o longhorn_rpc_protocol.o
 
 OUTPUT_FILE=liblonghorn.a
 HEADER_FILE=liblonghorn.h
@@ -23,14 +23,15 @@ $(OUTPUT_FILE): $(OBJECTS)
 .c.o:
 	$(CC) $(CFLAGS)
 
+log.o: src/log/log.h
+	$(CC) $(CFLAGS) -DBUILD_FOR_CONTAINER src/log/log.c
+
 longhorn_rpc_client.o: src/longhorn_rpc_client.c src/longhorn_rpc_client.h \
-	src/log.h src/longhorn_rpc_protocol.h \
-	src/uthash.h src/utlist.h
+	src/longhorn_rpc_protocol.h src/lib/uthash.h src/lib/utlist.h
 	$(CC) $(CFLAGS) src/longhorn_rpc_client.c
 
-longhorn_rpc_protocol.o: src/longhorn_rpc_protocol.c src/log.h \
-	src/longhorn_rpc_protocol.h \
-	src/uthash.h src/utlist.h
+longhorn_rpc_protocol.o: src/longhorn_rpc_protocol.c \
+	src/longhorn_rpc_protocol.h src/lib/uthash.h src/lib/utlist.h
 	$(CC) $(CFLAGS) src/longhorn_rpc_protocol.c
 
 clean:
