@@ -33,6 +33,7 @@ static ssize_t write_full(int fd, void *buf, ssize_t len) {
         while (nwrote < len) {
                 ret = write(fd, buf + nwrote, len - nwrote);
                 if (ret < 0) {
+                        log_error("write() error, errno: %d", errno);
                         if (errno == EINTR) {
                                 continue;
                         }
@@ -44,58 +45,22 @@ static ssize_t write_full(int fd, void *buf, ssize_t len) {
         return nwrote;
 }
 
-static int write_header(int fd, struct Message *msg, uint8_t *header) {
-        uint16_t MagicVersion = htole16(msg->MagicVersion);
-	uint32_t Seq = htole32(msg->Seq);
-	uint16_t Type = htole16(msg->Type);
-	uint64_t Offset = htole64(*((uint64_t *)(&msg->Offset)));
-	uint32_t Size = htole32(msg->Size);
-	uint32_t DataLength = htole32(msg->DataLength);
-
-        int offset = 0;
-
-        memcpy(header, &MagicVersion, sizeof(MagicVersion));
-        offset += sizeof(MagicVersion);
-
-        memcpy(header + offset, &Seq, sizeof(Seq));
-        offset += sizeof(Seq);
-
-        memcpy(header + offset, &Type, sizeof(Type));
-        offset += sizeof(Type);
-
-        memcpy(header + offset, &Offset, sizeof(Offset));
-        offset += sizeof(Offset);
-
-        memcpy(header + offset, &Size, sizeof(Size));
-        offset += sizeof(Size);
-
-        memcpy(header + offset, &DataLength, sizeof(DataLength));
-        offset += sizeof(DataLength);
-
-        return write_full(fd, header, offset);
-}
-
-int send_msg(int fd, struct Message *msg, uint8_t *header, int header_size) {
+int send_msg(int fd, struct Message *msg, void *header, ssize_t size) {
         ssize_t n = 0;
 
-        msg->MagicVersion = MAGIC_VERSION;
-
-        n = write_header(fd, msg, header);
-        if (n != header_size) {
+        n = write_full(fd, header, size);
+        if (n != size) {
                 log_error("fail to write header\n");
                 return -EINVAL;
         }
 
 	if (msg->DataLength != 0) {
-		n = write_full(fd, msg->Data, msg->DataLength);
-		if (n != msg->DataLength) {
-                        if (n < 0)
-                                perror("fail writing data");
-			log_error("fail to write data, wrote %zd; expected %u\n",
-                                        n, msg->DataLength);
+	        n = write_full(fd, msg->Data, msg->DataLength);
+                if (n != msg->DataLength) {
+	                log_error("fail to write data, wrote %zd; expected %u", n, msg->DataLength);
                         return -EINVAL;
-		}
-	}
+	        }
+        }
         return 0;
 }
 
@@ -147,7 +112,7 @@ int receive_msg(int fd, struct Message *msg, uint8_t *header, int header_size) {
         // full-duplex, so no need to lock
         n = read_header(fd, msg, header, header_size);
         if (n != header_size) {
-                log_error("fail to read header\n");
+                log_error("fail to read header, except: %d, actual: %d\n", header_size, n);
                 return -EINVAL;
         }
 

@@ -22,7 +22,7 @@ struct lh_client_conn {
 
         uint8_t *request_header;
         uint8_t *response_header;
-        int header_size;
+        ssize_t header_size;
 
         int request_timeout; // seconds
 };

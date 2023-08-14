@@ -22,12 +22,29 @@
 int retry_interval = 5;
 int retry_counts = 5;
 
+void generate_request_header(struct MessageHeader *header, struct Message *req) {
+        req->MagicVersion = MAGIC_VERSION;
+        header->MagicVersion = htole16(req->MagicVersion);
+        header->Seq = htole32(req->Seq);
+        header->Type = htole16(req->Type);
+        header->Offset= htole64(*((uint64_t *)(&req->Offset)));
+        header->Size= htole32(req->Size);
+        header->DataLength= htole32(req->DataLength);
+}
+
 int send_request(struct lh_client_conn *conn, struct Message *req) {
         int rc = 0;
 
+        struct MessageHeader *header;
+        header = malloc(conn->header_size);
+        generate_request_header(header, req);
+
+
         pthread_mutex_lock(&conn->mutex);
-        rc = send_msg(conn->fd, req, conn->request_header, conn->header_size);
+        rc = send_msg(conn->fd, req, header, conn->header_size);
         pthread_mutex_unlock(&conn->mutex);
+        
+        free(header);
         return rc;
 }
 
