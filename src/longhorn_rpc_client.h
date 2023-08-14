@@ -18,7 +18,6 @@ struct lh_client_conn {
         pthread_t timeout_thread;
 
         struct Message *msg_hashtable;
-        struct Message *msg_list;
         pthread_mutex_t msg_mutex;
 
         uint8_t *request_header;

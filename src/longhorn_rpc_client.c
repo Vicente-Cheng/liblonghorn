@@ -37,7 +37,6 @@ int receive_response(struct lh_client_conn *conn, struct Message *resp) {
 
 // Must be called with conn->msg_mutex hold
 void update_timeout_timer(struct lh_client_conn *conn) {
-        struct Message *head_msg = conn->msg_list;
         struct itimerspec its;
         its.it_value.tv_sec = 0;
         its.it_value.tv_nsec = 0;
@@ -46,7 +45,7 @@ void update_timeout_timer(struct lh_client_conn *conn) {
 
         // When there are messages on the queue, make timer that expires
         // request_timeout seconds from now.
-        if (head_msg != NULL) {
+        if (HASH_COUNT(conn->msg_hashtable) > 0) {
                 if (clock_gettime(CLOCK_MONOTONIC, &its.it_value) < 0) {
                         perror("Fail to get current time");
                         return;
@@ -84,10 +83,9 @@ void add_request_in_queue(struct lh_client_conn *conn, struct Message *req) {
         // We start the timer when there are no messages in the queue
         // This allows us to have a timeout in case the there is only one
         // message on the queue and we don't receive a response.
-        start_timer = (conn->msg_list == NULL);
+        start_timer = (HASH_COUNT(conn->msg_hashtable) == 0);
 
         HASH_ADD_INT(conn->msg_hashtable, Seq, req);
-        DL_APPEND(conn->msg_list, req);
 
         if (start_timer) {
                 update_timeout_timer(conn);
@@ -104,7 +102,6 @@ struct Message *find_and_remove_request_from_queue(struct lh_client_conn *conn,
         HASH_FIND_INT(conn->msg_hashtable, &seq, req);
         if (req != NULL) {
                 HASH_DEL(conn->msg_hashtable, req);
-                DL_DELETE(conn->msg_list, req);
                 // When we find a message on the queue, we will arm the timer
                 // for request_timeout seconds from now.  This ensures
                 // that when messages are on the queue, we should receive some
@@ -145,7 +142,6 @@ int lh_client_close_conn(struct lh_client_conn *conn) {
         // Clean up and fail all pending requests
         HASH_ITER(hh, conn->msg_hashtable, req, tmp) {
                 HASH_DEL(conn->msg_hashtable, req);
-                DL_DELETE(conn->msg_list, req);
 
                 pthread_mutex_lock(&req->mutex);
                 req->Type = TypeError;
@@ -248,7 +244,7 @@ void *timeout_handler(void *arg) {
         int ret;
         int nfds = 1;
         struct pollfd *fds = malloc(sizeof(struct pollfd) * nfds);
-        struct Message *req;
+        struct Message *req, *tmp;
         struct timespec now;
 
         fds[0].fd = conn->timeout_fd;
@@ -276,9 +272,8 @@ void *timeout_handler(void *arg) {
                 }
 
                 pthread_mutex_lock(&conn->msg_mutex);
-                DL_FOREACH(conn->msg_list, req) {
+                HASH_ITER(hh, conn->msg_hashtable, req, tmp) {
                         HASH_DEL(conn->msg_hashtable, req);
-                        DL_DELETE(conn->msg_list, req);
 
                         pthread_mutex_lock(&req->mutex);
                         req->Type = TypeError;
@@ -439,7 +434,6 @@ int lh_client_open_conn(struct lh_client_conn *conn, char *socket_path) {
         conn->fd = fd;
         conn->seq = 0;
         conn->msg_hashtable = NULL;
-        conn->msg_list = NULL;
 
         rc = pthread_mutex_init(&conn->mutex, NULL);
         if (rc < 0) {
