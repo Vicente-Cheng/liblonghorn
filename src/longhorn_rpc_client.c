@@ -122,6 +122,7 @@ struct Message *find_and_remove_request_from_queue(struct lh_client_conn *conn,
 
 int lh_client_close_conn(struct lh_client_conn *conn) {
         struct Message *req, *tmp;
+        uint_fast8_t validate_state = CLIENT_CONN_STATE_OPEN;
 
         if (conn == NULL) {
                 return 0;
@@ -129,17 +130,16 @@ int lh_client_close_conn(struct lh_client_conn *conn) {
 
         log_error("Closing connection\n");
 
-        pthread_mutex_lock(&conn->mutex);
-        if  (conn->state == CLIENT_CONN_STATE_CLOSE) {
-                pthread_mutex_unlock(&conn->mutex);
+        if (!atomic_compare_exchange_weak(&conn->state,
+                        &validate_state,
+                        CLIENT_CONN_STATE_CLOSE)) {
+                log_error("Connection is already closed\n");
                 return 0;
         }
 
         // Prevent future requests
-        conn->state = CLIENT_CONN_STATE_CLOSE;
         close(conn->timeout_fd);
         close(conn->fd);
-        pthread_mutex_unlock(&conn->mutex);
 
         pthread_mutex_lock(&conn->msg_mutex);
         // Clean up and fail all pending requests
@@ -316,7 +316,7 @@ int start_process(struct lh_client_conn *conn) {
 }
 
 int new_seq(struct lh_client_conn *conn) {
-        return __sync_fetch_and_add(&conn->seq, 1);
+        return atomic_fetch_add(&conn->seq, 1);
 }
 
 int process_request(struct lh_client_conn *conn, void *buf, size_t count, off_t offset,
@@ -324,13 +324,10 @@ int process_request(struct lh_client_conn *conn, void *buf, size_t count, off_t 
         struct Message *req = malloc(sizeof(struct Message));
         int rc = 0;
 
-        pthread_mutex_lock(&conn->mutex);
-        if (conn->state != CLIENT_CONN_STATE_OPEN) {
+        if (atomic_load(&conn->state) != CLIENT_CONN_STATE_OPEN) {
                 log_error("Cannot queue in more request. Connection is not open\n");
-                pthread_mutex_unlock(&conn->mutex);
                 return -EFAULT;
         }
-        pthread_mutex_unlock(&conn->mutex);
 
         if (req == NULL) {
                 perror("cannot allocate memory for req");
