@@ -2,7 +2,6 @@
 #define _LOG_H
 
 #include <stdarg.h>
-# define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>

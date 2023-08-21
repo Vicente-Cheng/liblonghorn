@@ -24,7 +24,7 @@ $(OUTPUT_FILE): $(OBJECTS)
 	$(CC) $(CFLAGS)
 
 log.o: src/log/log.h
-	$(CC) $(CFLAGS) -DBUILD_FOR_CONTAINER src/log/log.c
+	$(CC) $(CFLAGS) -DBUILD_FOR_CONTAINER -D_GNU_SOURCE src/log/log.c
 
 longhorn_rpc_client.o: src/longhorn_rpc_client.c src/longhorn_rpc_client.h \
 	src/longhorn_rpc_protocol.h src/lib/uthash.h src/lib/utlist.h

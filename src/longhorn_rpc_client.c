@@ -376,6 +376,7 @@ int process_request(struct lh_client_conn *conn, void *buf, size_t count, off_t 
                 goto free;
         }
 
+        log_info("[VICENTE LIBLH] add request %d to queue, OP: %d, offset: %u, dataLength: %u\n", req->Seq, req->Type, req->Offset, req->DataLength);
         add_request_in_queue(conn, req);
 
         pthread_mutex_lock(&req->mutex);
@@ -393,6 +394,7 @@ out:
         pthread_mutex_unlock(&req->mutex);
         // need to clean up in case send_request() failed
         find_and_remove_request_from_queue(conn, req->Seq);
+        log_info("[VICENTE LIBLH] request %d done, OP: %d, offset: %u, dataLength: %u\n", req->Seq, req->Type, req->Offset, req->DataLength);
 free:
         free(req);
         return rc;
