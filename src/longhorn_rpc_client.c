@@ -432,6 +432,7 @@ int lh_client_open_conn(struct lh_client_conn *conn, char *socket_path) {
                 return -EINVAL;
         }
 
+        log_info("[VICENTE DEBUG]: Connecting to %s\n", socket_path);
         strncpy(addr.sun_path, socket_path, strlen(socket_path));
 
         for (i = 0; i < retry_counts; i ++) {
